@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quotation - DP Shetty</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arimo', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* Print specific styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            .print-area {
+                display: block !important;
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
+
+            body {
+                background: white;
+            }
+
+            .shadow-2xl {
+                box-shadow: none !important;
+            }
+
+            .bg-white {
+                background: transparent !important;
+            }
+        }
+
+        /* A4 Size Simulation - Exact A4 dimensions */
+        .a4-page {
+            width: 206mm;
+            height: 293mm;
+            padding: 10mm;
+            margin: 0 auto;
+            background: white;
+            position: relative;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            page-break-inside: avoid;
+            page-break-after: avoid;
+            overflow: hidden;
+            border: 2px solid #000;
+        }
+
+        /* Custom Table Styles with Fixed Layout */
+        .bill-table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        /* Fixed Column Widths */
+        .bill-table th:nth-child(1),
+        .bill-table td:nth-child(1) {
+            width: 8%;
+        }
+
+        .bill-table th:nth-child(2),
+        .bill-table td:nth-child(2) {
+            width: 67%;
+        }
+
+        .bill-table th:nth-child(3),
+        .bill-table td:nth-child(3) {
+            width: 10%;
+        }
+
+        .bill-table th:nth-child(4),
+        .bill-table td:nth-child(4) {
+            width: 15%;
+        }
+
+        .bill-table th {
+            padding: 8px;
+            font-weight: 700;
+            background-color: #f9fafb;
+            text-align: center;
+            vertical-align: middle;
+            border: 1px solid #000;
+        }
+
+        .bill-table td {
+            padding: 6px 8px;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            border-left: 1px solid #000;
+            border-right: 1px solid #000;
+        }
+
+        .bill-table tbody tr {
+            border-bottom: none;
+        }
+
+        /* Highlight rows on hover */
+        .bill-table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        /* Remove number input spinners */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        /* Input focus styles */
+        input:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        /* Terms section - fixed at bottom */
+        .terms-section {
+            margin-top: auto;
+            page-break-inside: avoid;
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden" x-data="billApp()">
+
+    <!-- Header (No Print) -->
+    <header
+        class="bg-gray-800 text-white px-4 md:px-6 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-3 no-print shadow-md z-10">
+        <div class="flex items-center gap-2 md:gap-3">
+            <img src="https://www.samsung.com/etc.clientlibs/samsung/clientlibs/consumer/global/clientlib-consumer/resources/images/logo.svg"
+                alt="Samsung Logo" class="h-6 md:h-8">
+            <h1 class="text-sm md:text-lg font-bold">Quotation Generator</h1>
+            <span class="text-xs bg-gray-700 px-2 py-1 rounded">DP Shetty Version</span>
+        </div>
+        <button @click="downloadPDF()"
+            class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded shadow flex items-center gap-2 text-sm font-bold transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 16v1a3 0 003 3h10a3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download PDF
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+
+        <!-- Left Sidebar: Inputs (No Print) -->
+        <div
+            class="w-full md:w-1/3 md:min-w-[350px] bg-white border-r border-gray-200 overflow-y-auto p-4 md:p-6 no-print z-10 shadow-lg md:max-h-full">
+
+            <div class="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 class="text-sm font-bold text-gray-800 mb-2 uppercase">Header Setup</h3>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Header Image</label>
+                    <input type="file" @change="uploadHeaderImage($event)" accept="image/*"
+                        class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <p class="text-xs text-gray-500 mt-1">Select an image to display at the top of the invoice.</p>
+                </div>
+            </div>
+
+            <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <h3 class="text-sm font-bold text-blue-800 mb-2 uppercase">Quotation Details</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Quotation No</label>
+                        <input type="text" x-model="invoice.number"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Date</label>
+                        <input type="date" x-model="invoice.date"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm font-bold">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-gray-700 mb-3 uppercase border-b pb-2">Customer Information</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Name</label>
+                        <input type="text" x-model="customer.name"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Address</label>
+                        <textarea x-model="customer.address" rows="2"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" x-model="customer.phone"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-bold text-gray-700 uppercase border-b pb-2 flex-1">Items</h3>
+                    <button @click="addItem()"
+                        class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow transition-colors">
+                        + Add Item
+                    </button>
+                </div>
+                <div class="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+                    <template x-for="(item, index) in items" :key="index">
+                        <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 relative">
+                            <button @click="removeItem(index)"
+                                class="absolute top-2 right-2 text-red-600 hover:text-red-800 font-bold text-sm">✕</button>
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Item Name</label>
+                                    <input type="text" x-model="item.name"
+                                        class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">Qty</label>
+                                        <input type="number" x-model.number="item.qty"
+                                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">Price</label>
+                                        <input type="number" x-model.number="item.price"
+                                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Live Preview (Print Area) -->
+        <div class="flex-1 bg-gray-200 overflow-y-auto flex justify-center items-start p-2 md:p-6">
+            <div id="invoice-preview" class="a4-page shadow-2xl">
+
+                <!-- 1. Header Section -->
+                <div class="relative flex items-center justify-center p-4 border-b border-black mb-3">
+                    <div x-show="shop.headerImage" class="absolute left-0 top-1/2 transform -translate-y-1/2 w-48">
+                        <img :src="shop.headerImage" class="max-h-40 w-auto object-contain" alt="Header">
+                    </div>
+
+                    <div class="absolute right-0 top-6 text-right">
+                        <div style="font-size: 12px;">
+                            <span class="font-bold">Mobile:</span> <span class="font-bold" x-text="shop.mobile"></span>
+                        </div>
+                    </div>
+
+                    <div class="text-center w-full">
+                        <h2 class="font-bold uppercase tracking-wide"
+                            style="font-size: 20px; font-weight: 800; margin-bottom: 2px;" x-text="shop.name"></h2>
+                        <p class="font-bold"
+                            style="font-size: 13px; line-height: 1.2; margin-bottom: 2px; white-space: pre-line;"
+                            x-text="shop.address"></p>
+                        <div style="font-size: 12px;">
+                            <span><span class="font-bold">Email:</span> <span class="font-bold"
+                                    x-text="shop.email"></span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Customer & Quotation Info (Side by Side) -->
+                <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #000;">
+                    <div class="grid grid-cols-2" style="padding: 8px 0;">
+                        <!-- Left: Customer Info -->
+                        <div class="pr-3 border-r border-black">
+                            <h3 class="font-bold mb-2 " style="font-size: 14px;">Customer Detail</h3>
+                            <div class="space-y-0.5" style="font-size: 12px; padding-left: 20px;">
+                                <div class="flex">
+                                    <span class="font-bold w-28">Name</span>
+                                    <span class="mr-2">:</span>
+                                    <span class="flex-1 font-bold" x-text="customer.name"></span>
+                                </div>
+                                <div class="flex">
+                                    <span class="font-bold w-28">Address</span>
+                                    <span class="mr-2">:</span>
+                                    <div class="flex-1 whitespace-pre-line font-bold" x-text="customer.address"></div>
+                                </div>
+                                <div class="flex">
+                                    <span class="font-bold w-28">Contact Number</span>
+                                    <span class="mr-2">:</span>
+                                    <span class="flex-1 font-bold" x-text="customer.phone"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Quotation Details -->
+                        <div class="pl-3">
+                            <h3 class="font-bold mb-2 " style="font-size: 14px;">Quotation Detail</h3>
+                            <div class="space-y-0.5" style="font-size: 12px; padding-left: 20px;">
+                                <div class="flex">
+                                    <span class="font-bold w-16">Number</span>
+                                    <span class="mr-1.5">:</span>
+                                    <span class="flex-1 font-bold" x-text="invoice.number"></span>
+                                </div>
+                                <div class="flex">
+                                    <span class="font-bold w-16">Date</span>
+                                    <span class="mr-1.5">:</span>
+                                    <span class="flex-1 font-bold" x-text="formatDate(invoice.date)"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Quotation Title -->
+                <div class="text-center" style="margin-bottom: 0px; margin-top: 0px;">
+                    <h3 class="font-bold uppercase tracking-wider" style="font-size: 16px;">QUOTATION</h3>
+                </div>
+
+                <!-- 4. Items Table -->
+                <div style="margin-bottom: 10px;">
+                    <table class="bill-table">
+                        <thead>
+                            <tr class="border-t-2 border-l border-r border-black">
+                                <th class="text-center" style="font-size: 13px;">S.No</th>
+                                <th class="text-left" style="font-size: 13px;">Product</th>
+                                <th class="text-center" style="font-size: 13px;">Qty</th>
+                                <th class="text-center" style="font-size: 13px;">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(item, index) in items" :key="index">
+                                <tr class="border-l border-r border-b border-black">
+                                    <td class="text-center font-bold border-l border-r border-black"
+                                        style="font-size: 12px;" x-text="index + 1"></td>
+                                    <td class="text-left font-bold border-r border-black"
+                                        style="word-wrap: break-word; font-size: 12px;">
+                                        <div x-text="item.name"></div>
+                                    </td>
+                                    <td class="text-center font-bold border-r border-black" style="font-size: 12px;"
+                                        x-text="item.qty"></td>
+                                    <td class="text-center font-bold border-r border-black" style="font-size: 12px;"
+                                        x-text="formatCurrency(item.price || 0)"></td>
+                                </tr>
+                            </template>
+                            <!-- Filler rows to extend table vertically -->
+                            <template x-for="i in fillerRowCount()" :key="'filler-' + i">
+                                <tr class="border-l border-r border-black" style="height: 30px;">
+                                    <td class="border-l border-r border-black" style="padding: 0;">&nbsp;</td>
+                                    <td class="border-r border-black" style="padding: 0;"></td>
+                                    <td class="border-r border-black" style="padding: 0;"></td>
+                                    <td class="border-r border-black" style="padding: 0;"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                        <tfoot>
+                            <!-- Spacing row to move Grand Total 20px down -->
+                            <tr style="height: 20px;">
+                                <td class="border-l border-r border-black" style="padding: 0; border-bottom: none;">
+                                </td>
+                                <td class="border-r border-black" style="padding: 0; border-bottom: none;"></td>
+                                <td class="border-r border-black" style="padding: 0; border-bottom: none;"></td>
+                                <td class="border-r border-black" style="padding: 0; border-bottom: none;"></td>
+                            </tr>
+                            <tr class="border-t-2 border-l border-r border-b-2 border-black"
+                                style="background-color: #f3f4f6;">
+                                <td colspan="3" class="text-center font-bold"
+                                    style="padding: 8px; font-size: 13px; font-weight: 800;">Total Amount</td>
+                                <td class="text-center font-bold"
+                                    style="padding: 8px; font-size: 13px; font-weight: 800;"
+                                    x-text="formatCurrency(items.reduce((acc, i) => acc + ((i.qty || 0) * (i.price || 0)), 0))">
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- 5. Terms & Conditions Section - AT BOTTOM -->
+                <div class="terms-section">
+                    <h4 class="text-sm font-bold underline mb-2">Terms & Conditions :</h4>
+                    <ol class="list-decimal list-outside ml-4 text-[11px] font-medium leading-relaxed">
+                        <li>Quoted price valid for 15 days and subject to change without notice.</li>
+                        <li>All prices inclusive of GST, unless mentioned otherwise.</li>
+                        <li>100% payment required before delivery.</li>
+                    </ol>
+                </div>
+
+                <!-- 6. Authorized Signatory Section -->
+                <div class="mt-auto pt-6 flex justify-end">
+                    <div class="text-center" style="width: 180px;">
+                        <div class="border-t border-black mb-1"></div>
+                        <p class="font-bold uppercase" style="font-size: 11px;">Authorized Signatory</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function billApp() {
+            return {
+                shop: {
+                    headerImage: null,
+                    name: 'MANGALORE DIGITAL MATRIX',
+                    address: 'Athena Hospital Complex , Falnir Road\nD.K, Karnataka - 575001',
+                    email: 'mangaloredigitalmatrix@gmail.com',
+                    mobile: '8884348383'
+                },
+                invoice: {
+                    number: '',
+                    date: ''
+                },
+                customer: {
+                    name: '',
+                    address: '',
+                    phone: ''
+                },
+                items: [
+                    { name: '', qty: 1, price: 0 }
+                ],
+
+                uploadHeaderImage(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.shop.headerImage = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                },
+
+                addItem() {
+                    this.items.push({ name: '', qty: 1, price: 0 });
+                },
+
+                removeItem(index) {
+                    if (this.items.length > 1) {
+                        this.items.splice(index, 1);
+                    }
+                },
+
+                calculateTotal() {
+                    return this.items.reduce((acc, item) => acc + (item.price || 0), 0);
+                },
+
+                formatCurrency(value) {
+                    return new Intl.NumberFormat('en-IN').format(value);
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    // Format: DD/MM/YYYY
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}/${month}/${year}`;
+                },
+
+                fillerRowCount() {
+                    // Calculate number of filler rows needed to extend table vertically
+                    // Aim for approximately 12 total rows (including actual items)
+                    const minRows = 14;
+                    const currentRows = this.items.length;
+                    const fillersNeeded = Math.max(0, minRows - currentRows);
+                    return fillersNeeded;
+                },
+
+                downloadPDF() {
+                    const element = document.getElementById('invoice-preview');
+
+                    // OPTIMIZED PDF SETTINGS
+                    const opt = {
+                        margin: [2, 0, 0, 0], // Slight top margin to ensure top border is visible
+                        filename: `Quotation_${(this.customer.name || 'Customer').replace(/\s+/g, '_')}_${this.invoice.date || 'Date'}.pdf`,
+                        image: { type: 'jpeg', quality: 1.0 },
+                        html2canvas: {
+                            scale: 4,
+                            useCORS: true,
+                            logging: false,
+                            letterRendering: true,
+                            scrollY: 0,
+                            windowWidth: element.clientWidth, // Lock width during capture
+                            windowHeight: element.clientHeight // Lock height during capture
+                        },
+                        jsPDF: {
+                            unit: 'mm',
+                            format: 'a4',
+                            orientation: 'portrait',
+                            compress: true,
+                            precision: 16 // Increase precision for better alignment
+                        },
+                        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                    };
+
+                    html2pdf().set(opt).from(element).save();
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
