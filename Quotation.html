@@ -303,8 +303,8 @@
 
                 <!-- 1. Header Section -->
                 <div class="relative flex items-center justify-center p-4 border-b border-black mb-3">
-                    <div x-show="shop.headerImage" class="absolute left-0 top-1/2 transform -translate-y-1/2 w-48">
-                        <img :src="shop.headerImage" class="max-h-40 w-auto object-contain" alt="Header">
+                    <div x-show="shop.headerImage" class="absolute left-0 top-1/2 transform -translate-y-1/2 w-32">
+                        <img :src="shop.headerImage" class="max-h-24 w-auto object-contain" alt="Header">
                     </div>
 
                     <div class="absolute right-0 top-6 text-right">
@@ -556,28 +556,33 @@
                 downloadPDF() {
                     const element = document.getElementById('invoice-preview');
 
+                    // A4 dimensions in pixels at 96dpi: 794 x 1123
+                    const a4WidthPx = 794;
+                    const a4HeightPx = 1123;
+
                     // OPTIMIZED PDF SETTINGS
                     const opt = {
-                        margin: [2, 0, 0, 0], // Slight top margin to ensure top border is visible
+                        margin: 0,
                         filename: `Quotation_${(this.customer.name || 'Customer').replace(/\s+/g, '_')}_${this.invoice.date || 'Date'}.pdf`,
                         image: { type: 'jpeg', quality: 1.0 },
                         html2canvas: {
-                            scale: 4,
+                            scale: 3,
                             useCORS: true,
                             logging: false,
                             letterRendering: true,
+                            scrollX: 0,
                             scrollY: 0,
-                            windowWidth: element.clientWidth, // Lock width during capture
-                            windowHeight: element.clientHeight // Lock height during capture
+                            width: a4WidthPx,
+                            height: a4HeightPx,
+                            windowWidth: a4WidthPx,
+                            windowHeight: a4HeightPx
                         },
                         jsPDF: {
                             unit: 'mm',
                             format: 'a4',
                             orientation: 'portrait',
-                            compress: true,
-                            precision: 16 // Increase precision for better alignment
-                        },
-                        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                            compress: true
+                        }
                     };
 
                     html2pdf().set(opt).from(element).save();
