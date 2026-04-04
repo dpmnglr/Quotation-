@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice - DP Shetty</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arimo', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* Print specific styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            .print-area {
+                display: block !important;
+                width: 100%;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
+
+            body {
+                background: white;
+            }
+
+            .shadow-2xl {
+                box-shadow: none !important;
+            }
+
+            .bg-white {
+                background: transparent !important;
+            }
+        }
+
+        /* A4 Size Simulation */
+        .a4-page {
+            width: 206mm;
+            height: 293mm;
+            padding: 10mm;
+            margin: 0 auto;
+            background: white;
+            position: relative;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            page-break-inside: avoid;
+            page-break-after: avoid;
+            overflow: hidden;
+            border: 2px solid #000;
+        }
+
+        /* Custom Table Styles with Fixed Layout */
+        .bill-table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        /* Fixed Column Widths for 9-column GST table */
+        .bill-table th:nth-child(1),
+        .bill-table td:nth-child(1) { width: 5%; }   /* S.No */
+
+        .bill-table th:nth-child(2),
+        .bill-table td:nth-child(2) { width: 27%; }  /* Product */
+
+        .bill-table th:nth-child(3),
+        .bill-table td:nth-child(3) { width: 10%; }  /* HSN/SAC */
+
+        .bill-table th:nth-child(4),
+        .bill-table td:nth-child(4) { width: 5%; }   /* Qty */
+
+        .bill-table th:nth-child(5),
+        .bill-table td:nth-child(5) { width: 12%; }  /* Price */
+
+        .bill-table th:nth-child(6),
+        .bill-table td:nth-child(6) { width: 7%; }   /* GST% */
+
+        .bill-table th:nth-child(7),
+        .bill-table td:nth-child(7) { width: 11%; }  /* SGST */
+
+        .bill-table th:nth-child(8),
+        .bill-table td:nth-child(8) { width: 11%; }  /* CGST */
+
+        .bill-table th:nth-child(9),
+        .bill-table td:nth-child(9) { width: 12%; }  /* Total */
+
+        .bill-table th {
+            padding: 5px 4px;
+            font-weight: 700;
+            background-color: #f0f0f0;
+            text-align: center;
+            vertical-align: middle;
+            border: 1px solid #000;
+            font-size: 10px;
+        }
+
+        .bill-table td {
+            padding: 4px 4px;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            border-left: 1px solid #000;
+            border-right: 1px solid #000;
+            font-size: 11px;
+        }
+
+        .bill-table tbody tr {
+            border-bottom: none;
+        }
+
+        .bill-table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        /* Remove number input spinners */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
+        input:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+
+        .terms-section {
+            margin-top: auto;
+            page-break-inside: avoid;
+        }
+
+        /* Tax summary box */
+        .tax-summary-table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        .tax-summary-table td {
+            padding: 3px 8px;
+            font-size: 11px;
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden" x-data="billApp()">
+
+    <!-- Header (No Print) -->
+    <header
+        class="bg-gray-800 text-white px-4 md:px-6 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 md:gap-3 no-print shadow-md z-10">
+        <div class="flex items-center gap-2 md:gap-3">
+            <img src="samsung-logo-png-1305.png" alt="Samsung Logo" class="h-6 md:h-8">
+            <h1 class="text-sm md:text-lg font-bold">Invoice Generator</h1>
+            <span class="text-xs bg-gray-700 px-2 py-1 rounded">DP Shetty Version</span>
+        </div>
+        <button @click="downloadPDF()"
+            class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded shadow flex items-center gap-2 text-sm font-bold transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download PDF
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+
+        <!-- Left Sidebar: Inputs (No Print) -->
+        <div
+            class="w-full md:w-1/3 md:min-w-[360px] bg-white border-r border-gray-200 overflow-y-auto p-4 md:p-6 no-print z-10 shadow-lg md:max-h-full">
+
+            <!-- Hidden sections -->
+            <div class="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200" style="display: none;">
+                <h3 class="text-sm font-bold text-gray-800 mb-2 uppercase">Header Setup</h3>
+                <p class="text-xs text-gray-500">Header image is set to "Header image.png".</p>
+            </div>
+
+            <div class="mb-6 bg-purple-50 p-4 rounded-lg border border-purple-200" style="display: none;">
+                <h3 class="text-sm font-bold text-purple-800 mb-3 uppercase">A4 Background</h3>
+                <p class="text-xs text-gray-500">Background image is set to "1775027629580.png".</p>
+            </div>
+
+            <!-- Invoice Details -->
+            <div class="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <h3 class="text-sm font-bold text-blue-800 mb-3 uppercase">Invoice Details</h3>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Invoice No</label>
+                        <input type="text" x-model="invoice.number"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm font-bold bg-gray-100"
+                            readonly>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Date</label>
+                        <input type="date" x-model="invoice.date"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm font-bold">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Place of Supply</label>
+                        <input type="text" x-model="invoice.placeOfSupply" placeholder="e.g. Karnataka"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Payment Mode</label>
+                        <select x-model="invoice.paymentMode"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm font-bold">
+                            <option value="Cash">Cash</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Information -->
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-gray-700 mb-3 uppercase border-b pb-2">Customer Information</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Name</label>
+                        <input type="text" x-model="customer.name"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Address</label>
+                        <textarea x-model="customer.address" rows="2"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" x-model="customer.phone"
+                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items -->
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-bold text-gray-700 uppercase border-b pb-2 flex-1">Items</h3>
+                    <button @click="addItem()"
+                        class="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold shadow transition-colors">
+                        + Add Item
+                    </button>
+                </div>
+                <div class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                    <template x-for="(item, index) in items" :key="index">
+                        <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 relative">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold text-gray-500">Item <span x-text="index + 1"></span></span>
+                                <button @click="removeItem(index)"
+                                    class="text-red-600 hover:text-red-800 font-bold text-sm">✕</button>
+                            </div>
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Item Name</label>
+                                    <input type="text" x-model="item.name"
+                                        class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1">Serial Number / IMEI</label>
+                                    <input type="text" x-model="item.serial" placeholder="e.g. 359876543210001"
+                                        class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm font-mono tracking-wide">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">HSN/SAC Code</label>
+                                        <input type="text" x-model="item.hsn" placeholder="e.g. 8517"
+                                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">GST %</label>
+                                        <select x-model.number="item.gst"
+                                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm font-bold">
+                                            <option value="0">0%</option>
+                                            <option value="5">5%</option>
+                                            <option value="12">12%</option>
+                                            <option value="18">18%</option>
+                                            <option value="28">28%</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">Qty</label>
+                                        <input type="number" x-model.number="item.qty" min="1"
+                                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1">Unit Price ₹ <span class="text-blue-600 font-normal">(GST incl.)</span></label>
+                                        <input type="number" x-model.number="item.price" min="0"
+                                            class="w-full rounded border-gray-300 border px-2 py-1.5 text-sm">
+                                    </div>
+                                </div>
+                                <!-- Live tax breakdown (price entered is GST-inclusive) -->
+                                <div class="bg-blue-50 rounded p-2 text-xs text-gray-600 mt-1 space-y-0.5">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-500">Base (excl. GST)</span>
+                                        <strong x-text="'₹' + formatCurrency(itemBase(item))"></strong>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-500">SGST (<span x-text="(item.gst||0)/2"></span>%)</span>
+                                        <strong x-text="'₹' + formatCurrency(itemSGST(item))"></strong>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-500">CGST (<span x-text="(item.gst||0)/2"></span>%)</span>
+                                        <strong x-text="'₹' + formatCurrency(itemCGST(item))"></strong>
+                                    </div>
+                                    <div class="flex justify-between border-t border-blue-200 pt-0.5 text-blue-800">
+                                        <span class="font-bold">Total (incl. GST)</span>
+                                        <strong x-text="'₹' + formatCurrency(itemTotal(item))"></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Totals summary in sidebar -->
+                <div class="mt-4 bg-gray-800 text-white rounded-lg p-3 text-sm space-y-1">
+                    <div class="flex justify-between text-gray-300 text-xs">
+                        <span>Taxable Amount</span>
+                        <span x-text="'₹' + formatCurrency(calcSubtotal())"></span>
+                    </div>
+                    <div class="flex justify-between text-gray-400 text-xs">
+                        <span>SGST Amount</span>
+                        <span x-text="'₹' + formatCurrency(calcTotalSGST())"></span>
+                    </div>
+                    <div class="flex justify-between text-gray-400 text-xs">
+                        <span>CGST Amount</span>
+                        <span x-text="'₹' + formatCurrency(calcTotalCGST())"></span>
+                    </div>
+                    <div class="flex justify-between text-gray-300 text-xs border-t border-gray-600 pt-1">
+                        <span class="font-bold">GST Amount (SGST + CGST)</span>
+                        <span class="font-bold" x-text="'₹' + formatCurrency(calcTotalGST())"></span>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-500 pt-1 text-yellow-300 font-bold">
+                        <span>TOTAL (Incl. GST)</span>
+                        <span x-text="'₹' + formatCurrency(calcGrandTotal())"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Live Preview (Print Area) -->
+        <div class="flex-1 bg-gray-200 overflow-y-auto flex justify-center items-start p-2 md:p-6">
+            <div id="invoice-preview" class="a4-page shadow-2xl"
+                :style="shop.bgImage ? `background-image: url('${shop.bgImage}'); background-size: auto 80%; background-position: 50% center; background-repeat: no-repeat;` : ''"
+                style="position: relative;">
+                <!-- BG overlay for fixed opacity -->
+                <div x-show="shop.bgImage"
+                    style="position:absolute;inset:0;background:white;opacity:0.97;pointer-events:none;z-index:0;"></div>
+                <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+
+                    <!-- 1. Header Section -->
+                    <div class="relative flex items-center justify-center p-4 border-b border-black mb-2">
+                        <div x-show="shop.headerImage" class="absolute left-0 top-1/2 transform -translate-y-1/2 w-40">
+                            <img :src="shop.headerImage" class="max-h-32 w-auto object-contain" alt="Header">
+                        </div>
+                        <div class="absolute right-0 top-6 text-right">
+                            <div style="font-size: 12px;">
+                                <span class="font-bold">Mobile:</span>
+                                <span class="font-bold" x-text="shop.mobile"></span>
+                            </div>
+                        </div>
+                        <div class="absolute right-0 bottom-4 text-right">
+                            <div style="font-size: 12px;">
+                                <span class="font-bold">GSTIN:</span>
+                                <span class="font-bold">29ABQFM3560L1ZK</span>
+                            </div>
+                        </div>
+                        <div class="text-center w-full">
+                            <h2 class="font-bold uppercase tracking-wide"
+                                style="font-size: 20px; font-weight: 800; margin-bottom: 2px;" x-text="shop.name"></h2>
+                            <p class="font-bold"
+                                style="font-size: 13px; line-height: 1.2; margin-bottom: 2px; white-space: pre-line;"
+                                x-text="shop.address"></p>
+                            <div style="font-size: 12px;">
+                                <span><span class="font-bold">Email:</span> <span class="font-bold"
+                                        x-text="shop.email"></span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. INVOICE Title -->
+                    <div class="text-center" style="margin-bottom: 6px;">
+                        <h3 class="font-bold uppercase tracking-widest"
+                            style="font-size: 15px; letter-spacing: 0.15em; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 0;">
+                            INVOICE
+                        </h3>
+                    </div>
+
+                    <!-- 3. Customer & Invoice Info (Side by Side) -->
+                    <div style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #000;">
+                        <div class="grid grid-cols-2" style="padding: 4px 0;">
+                            <!-- Left: Customer Info -->
+                            <div class="pr-3 border-r border-black">
+                                <h3 class="font-bold mb-1" style="font-size: 12px; text-decoration: underline;">Bill To:</h3>
+                                <div class="space-y-0" style="font-size: 11px; padding-left: 4px;">
+                                    <div class="flex">
+                                        <span class="font-bold w-24">Name</span>
+                                        <span class="mr-2">:</span>
+                                        <span class="flex-1 font-bold" x-text="customer.name"></span>
+                                    </div>
+                                    <div class="flex">
+                                        <span class="font-bold w-24">Address</span>
+                                        <span class="mr-2">:</span>
+                                        <div class="flex-1 whitespace-pre-line font-bold" x-text="customer.address"></div>
+                                    </div>
+                                    <div class="flex">
+                                        <span class="font-bold w-24">Phone</span>
+                                        <span class="mr-2">:</span>
+                                        <span class="flex-1 font-bold" x-text="customer.phone"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Invoice Details -->
+                            <div class="pl-3">
+                                <h3 class="font-bold mb-1" style="font-size: 12px; text-decoration: underline;">Invoice Detail:</h3>
+                                <div class="space-y-0" style="font-size: 11px; padding-left: 4px;">
+                                    <div class="flex">
+                                        <span class="font-bold w-28">Invoice No</span>
+                                        <span class="mr-1.5">:</span>
+                                        <span class="flex-1 font-bold" x-text="invoice.number"></span>
+                                    </div>
+                                    <div class="flex">
+                                        <span class="font-bold w-28">Date</span>
+                                        <span class="mr-1.5">:</span>
+                                        <span class="flex-1 font-bold" x-text="formatDate(invoice.date)"></span>
+                                    </div>
+                                    <div class="flex">
+                                        <span class="font-bold w-28">Place of Supply</span>
+                                        <span class="mr-1.5">:</span>
+                                        <span class="flex-1 font-bold" x-text="invoice.placeOfSupply"></span>
+                                    </div>
+                                    <div class="flex">
+                                        <span class="font-bold w-28">Payment Mode</span>
+                                        <span class="mr-1.5">:</span>
+                                        <span class="flex-1 font-bold" x-text="invoice.paymentMode"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Items Table -->
+                    <div style="margin-bottom: 6px;">
+                        <table class="bill-table">
+                            <thead>
+                                <tr class="border-t-2 border-l border-r border-black">
+                                    <th style="font-size: 10px;">S.No</th>
+                                    <th class="text-left" style="font-size: 10px;">Product</th>
+                                    <th style="font-size: 10px;">HSN/<br>SAC</th>
+                                    <th style="font-size: 10px;">Qty</th>
+                                    <th style="font-size: 10px;">Unit Price<br>(Incl. GST)</th>
+                                    <th style="font-size: 10px;">GST<br>%</th>
+                                    <th style="font-size: 10px;">SGST<br>(₹)</th>
+                                    <th style="font-size: 10px;">CGST<br>(₹)</th>
+                                    <th style="font-size: 10px;">Total<br>(₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(item, index) in items" :key="index">
+                                    <tr class="border-l border-r border-b border-black">
+                                        <td class="text-center font-bold border-l border-r border-black"
+                                            x-text="index + 1"></td>
+                                        <td class="text-left font-bold border-r border-black"
+                                            style="word-wrap: break-word;">
+                                            <div x-text="item.name"></div>
+                                            <div x-show="item.serial"
+                                                style="font-size: 9px; font-weight: 600; color: #555; margin-top: 1px; font-family: monospace; letter-spacing: 0.02em;"
+                                                x-text="'S/N: ' + item.serial"></div>
+                                        </td>
+                                        <td class="text-center font-bold border-r border-black"
+                                            x-text="item.hsn || '—'"></td>
+                                        <td class="text-center font-bold border-r border-black"
+                                            x-text="item.qty"></td>
+                                        <td class="text-right font-bold border-r border-black"
+                                            x-text="formatCurrency(item.price || 0)"></td>
+                                        <td class="text-center font-bold border-r border-black"
+                                            x-text="(item.gst || 0) + '%'"></td>
+                                        <td class="text-right font-bold border-r border-black"
+                                            x-text="formatCurrency(itemSGST(item))"></td>
+                                        <td class="text-right font-bold border-r border-black"
+                                            x-text="formatCurrency(itemCGST(item))"></td>
+                                        <td class="text-right font-bold border-r border-black"
+                                            x-text="formatCurrency(itemTotal(item))"></td>
+                                    </tr>
+                                </template>
+                                <!-- Filler rows -->
+                                <template x-for="i in fillerRowCount()" :key="'filler-' + i">
+                                    <tr class="border-l border-r border-black" style="height: 22px;">
+                                        <td class="border-l border-r border-black" style="padding:0;">&nbsp;</td>
+                                        <td class="border-r border-black" style="padding:0;"></td>
+                                        <td class="border-r border-black" style="padding:0;"></td>
+                                        <td class="border-r border-black" style="padding:0;"></td>
+                                        <td class="border-r border-black" style="padding:0;"></td>
+                                        <td class="border-r border-black" style="padding:0;"></td>
+                                        <td class="border-r border-black" style="padding:0;"></td>
+                                        <td class="border-r border-black" style="padding:0;"></td>
+                                        <td class="border-r border-black" style="padding:0;"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                            <tfoot>
+                                <!-- Row 1: Taxable Amount -->
+                                <tr style="background-color: #f9fafb; border-top: 2px solid #000;">
+                                    <td colspan="8"
+                                        style="font-size:11px; font-weight:700; padding:3px 8px; border:1px solid #000; border-top:2px solid #000; text-align:left;">
+                                        Taxable Amount
+                                    </td>
+                                    <td style="font-size:11px; font-weight:700; padding:3px 6px; border:1px solid #000; border-top:2px solid #000; text-align:right;"
+                                        x-text="formatCurrency(calcSubtotal())"></td>
+                                </tr>
+
+                                <!-- Row 2: SGST -->
+                                <tr style="background-color: #f9fafb;">
+                                    <td colspan="8"
+                                        style="font-size:11px; font-weight:600; padding:3px 8px; border:1px solid #000; text-align:left; color:#374151;">
+                                        SGST Amount
+                                    </td>
+                                    <td style="font-size:11px; font-weight:600; padding:3px 6px; border:1px solid #000; text-align:right; color:#374151;"
+                                        x-text="formatCurrency(calcTotalSGST())"></td>
+                                </tr>
+
+                                <!-- Row 3: CGST -->
+                                <tr style="background-color: #f9fafb;">
+                                    <td colspan="8"
+                                        style="font-size:11px; font-weight:600; padding:3px 8px; border:1px solid #000; text-align:left; color:#374151;">
+                                        CGST Amount
+                                    </td>
+                                    <td style="font-size:11px; font-weight:600; padding:3px 6px; border:1px solid #000; text-align:right; color:#374151;"
+                                        x-text="formatCurrency(calcTotalCGST())"></td>
+                                </tr>
+
+                                <!-- Row 4: GST Total (SGST + CGST) -->
+                                <tr style="background-color: #e5e7eb;">
+                                    <td colspan="8"
+                                        style="font-size:11px; font-weight:700; padding:3px 8px; border:1px solid #000; text-align:left;">
+                                        GST Amount (SGST + CGST)
+                                    </td>
+                                    <td style="font-size:11px; font-weight:700; padding:3px 6px; border:1px solid #000; text-align:right;"
+                                        x-text="formatCurrency(calcTotalGST())"></td>
+                                </tr>
+
+                                <!-- Row 5: Grand Total -->
+                                <tr style="background-color: #1f2937;">
+                                    <td colspan="8"
+                                        style="font-size:12px; font-weight:800; padding:5px 8px; border:1px solid #000; border-bottom:2px solid #000; text-align:left; color:#fff; letter-spacing:0.03em;">
+                                        TOTAL (Incl. GST)
+                                    </td>
+                                    <td style="font-size:13px; font-weight:800; padding:5px 6px; border:1px solid #000; border-bottom:2px solid #000; text-align:right; color:#fde68a;"
+                                        x-text="formatCurrency(calcGrandTotal())"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- 5. Amount in Words -->
+                    <div style="margin-bottom: 6px; border: 1px solid #000; padding: 4px 8px; background: #f9fafb;">
+                        <span style="font-size: 11px; font-weight: 700;">Amount in Words: </span>
+                        <span style="font-size: 11px; font-weight: 600; font-style: italic;"
+                            x-text="amountInWords(calcGrandTotal()) + ' Only'"></span>
+                    </div>
+
+                    <!-- 6. Terms & Conditions Section -->
+                    <div class="terms-section">
+                        <h4 class="text-sm font-bold mb-1">Terms & Conditions :</h4>
+                        <ol class="list-decimal list-outside ml-4 font-medium leading-relaxed" style="font-size: 10px;">
+                            <li>This is a computer-generated invoice and does not require a physical signature.</li>
+                            <li>Goods once sold will not be taken back or exchanged.</li>
+                            <li>Warranty as per Samsung company policy.</li>
+                            <li>Damages must be reported at the time of delivery.</li>
+                            <li>Disputes subject to local jurisdiction only.</li>
+                            <li>Payment due as per agreed terms.</li>
+                        </ol>
+                    </div>
+
+                    <!-- 7. Authorized Signatory Section -->
+                    <div class="mt-auto pt-4 flex justify-between items-end">
+                        <div style="font-size: 10px;">
+                            <p class="font-bold">Receiver's Signature</p>
+                            <div style="border-bottom: 1px solid #000; width: 140px; margin-top: 24px;"></div>
+                        </div>
+                        <div class="text-center" style="width: 180px;">
+                            <div class="border-t border-black mb-1"></div>
+                            <p class="font-bold uppercase" style="font-size: 11px;">Authorized Signatory</p>
+                            <p style="font-size: 10px;" x-text="shop.name"></p>
+                        </div>
+                    </div>
+
+                </div><!-- end z-index wrapper -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Invoice counter stored in sessionStorage to persist within session
+        function getNextInvoiceNumber() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const dateStr = `${yyyy}${mm}${dd}`;
+            const storageKey = `inv_counter_${dateStr}`;
+            let counter = parseInt(sessionStorage.getItem(storageKey) || '0') + 1;
+            sessionStorage.setItem(storageKey, counter);
+            return `INV-${dateStr}-${String(counter).padStart(3, '0')}`;
+        }
+
+        function billApp() {
+            return {
+                shop: {
+                    headerImage: 'Header image.png',
+                    bgImage: '1775027629580.png',
+                    bgOpacity: 0.15,
+                    name: 'MANGALORE DIGITAL MATRIX',
+                    address: 'Athena Hospital Complex , Falnir Road\nD.K, Karnataka - 575001',
+                    email: 'mangaloredigitalmatrix@gmail.com',
+                    mobile: '8884348383'
+                },
+                invoice: {
+                    number: getNextInvoiceNumber(),
+                    date: new Date().toISOString().split('T')[0],
+                    placeOfSupply: 'Karnataka',
+                    paymentMode: 'Cash'
+                },
+                customer: {
+                    name: '',
+                    address: '',
+                    phone: ''
+                },
+                items: [
+                    { name: '', serial: '', hsn: '', qty: 1, price: 0, gst: 18 }
+                ],
+
+                addItem() {
+                    this.items.push({ name: '', serial: '', hsn: '', qty: 1, price: 0, gst: 18 });
+                },
+
+                removeItem(index) {
+                    if (this.items.length > 1) {
+                        this.items.splice(index, 1);
+                    }
+                },
+
+                // ─────────────────────────────────────────────────────────────
+                // GST CALCULATION — Unit Price is GST-INCLUSIVE (back-calculate)
+                //   Inclusive Total = qty × price  (price already includes GST)
+                //   Base (excl. GST) = Inclusive Total ÷ (1 + GST% / 100)
+                //   Total GST Amount = Inclusive Total − Base
+                //   SGST = CGST = Total GST Amount ÷ 2
+                // ─────────────────────────────────────────────────────────────
+
+                // Inclusive line total (qty × GST-inclusive unit price)
+                itemInclusiveTotal(item) {
+                    return Math.round((item.qty || 0) * (item.price || 0) * 100) / 100;
+                },
+
+                // Base amount after removing GST
+                itemBase(item) {
+                    const inclusive = this.itemInclusiveTotal(item);
+                    const gstRate   = (item.gst || 0) / 100;
+                    return Math.round((inclusive / (1 + gstRate)) * 100) / 100;
+                },
+
+                // Total GST on this line
+                itemGSTAmount(item) {
+                    return Math.round((this.itemInclusiveTotal(item) - this.itemBase(item)) * 100) / 100;
+                },
+
+                // SGST = half of total GST
+                itemSGST(item) {
+                    return Math.round((this.itemGSTAmount(item) / 2) * 100) / 100;
+                },
+
+                // CGST = half of total GST
+                itemCGST(item) {
+                    return Math.round((this.itemGSTAmount(item) / 2) * 100) / 100;
+                },
+
+                // Line total (same as inclusive total — price entered already includes GST)
+                itemTotal(item) {
+                    return this.itemInclusiveTotal(item);
+                },
+
+                // ── Grand totals ──────────────────────────────────────────────
+                calcSubtotal() {
+                    // Sum of base amounts (excl. GST)
+                    return Math.round(this.items.reduce((acc, item) => acc + this.itemBase(item), 0) * 100) / 100;
+                },
+                calcTotalSGST() {
+                    return Math.round(this.items.reduce((acc, item) => acc + this.itemSGST(item), 0) * 100) / 100;
+                },
+                calcTotalCGST() {
+                    return Math.round(this.items.reduce((acc, item) => acc + this.itemCGST(item), 0) * 100) / 100;
+                },
+                // GST Total = SGST + CGST
+                calcTotalGST() {
+                    return Math.round((this.calcTotalSGST() + this.calcTotalCGST()) * 100) / 100;
+                },
+                calcGrandTotal() {
+                    // Sum of GST-inclusive line totals = sum of (qty × unit price)
+                    return Math.round(this.items.reduce((acc, item) => acc + this.itemInclusiveTotal(item), 0) * 100) / 100;
+                },
+
+                // ── Smart Indian currency format ───────────────────────────────
+                // Whole numbers → no decimals (1,00,000)
+                // Fractional   → exactly 2 dp (84,745.76)
+                formatCurrency(value) {
+                    const num = value || 0;
+                    const isWhole = Number.isInteger(Math.round(num * 100) / 100)
+                                    ? (num % 1 === 0)
+                                    : false;
+                    return new Intl.NumberFormat('en-IN', {
+                        minimumFractionDigits: isWhole ? 0 : 2,
+                        maximumFractionDigits: isWhole ? 0 : 2
+                    }).format(num);
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return '';
+                    const date = new Date(dateString);
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}/${month}/${year}`;
+                },
+
+                fillerRowCount() {
+                    const minRows = 10;
+                    const currentRows = this.items.length;
+                    return Math.max(0, minRows - currentRows);
+                },
+
+                // Amount in words (Indian number system)
+                amountInWords(amount) {
+                    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+                        'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+                        'Seventeen', 'Eighteen', 'Nineteen'];
+                    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+                    function convertHundreds(n) {
+                        if (n === 0) return '';
+                        if (n < 20) return ones[n];
+                        if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+                        return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + convertHundreds(n % 100) : '');
+                    }
+
+                    const num = Math.round(amount);
+                    if (num === 0) return 'Zero Rupees';
+
+                    const crore = Math.floor(num / 10000000);
+                    const lakh = Math.floor((num % 10000000) / 100000);
+                    const thousand = Math.floor((num % 100000) / 1000);
+                    const rest = num % 1000;
+
+                    let result = '';
+                    if (crore) result += convertHundreds(crore) + ' Crore ';
+                    if (lakh) result += convertHundreds(lakh) + ' Lakh ';
+                    if (thousand) result += convertHundreds(thousand) + ' Thousand ';
+                    if (rest) result += convertHundreds(rest);
+
+                    return 'Rupees ' + result.trim();
+                },
+
+                downloadPDF() {
+                    const source = document.getElementById('invoice-preview');
+
+                    // ── 1. Clone the invoice element off-screen ─────────────
+                    const clone = source.cloneNode(true);
+
+                    // ── 2. Strip all layout constraints from the clone ───────
+                    clone.style.cssText = `
+                        position: fixed;
+                        top: -99999px;
+                        left: -99999px;
+                        width: 794px;
+                        height: auto !important;
+                        min-height: unset;
+                        max-height: unset;
+                        overflow: visible !important;
+                        box-shadow: none;
+                        border: 2px solid #000;
+                        background: white;
+                        padding: 10mm;
+                        box-sizing: border-box;
+                        font-family: 'Arimo', sans-serif;
+                    `;
+
+                    document.body.appendChild(clone);
+
+                    const customerName = (this.customer.name || 'Customer').replace(/\s+/g, '_');
+                    const filename     = `Invoice_${this.invoice.number}_${customerName}.pdf`;
+
+                    const opt = {
+                        margin:   0,
+                        filename: filename,
+                        image:    { type: 'jpeg', quality: 1.0 },
+                        html2canvas: {
+                            scale:           3,
+                            useCORS:         true,
+                            logging:         false,
+                            letterRendering: true,
+                            scrollX:         0,
+                            scrollY:         0,
+                            windowWidth:     794,
+                            backgroundColor: '#ffffff'
+                        },
+                        jsPDF: {
+                            unit:        'mm',
+                            format:      'a4',
+                            orientation: 'portrait',
+                            compress:    true
+                        }
+                    };
+
+                    // ── 3. Capture clone → save → remove clone ───────────────
+                    html2pdf()
+                        .set(opt)
+                        .from(clone)
+                        .save()
+                        .finally(() => {
+                            document.body.removeChild(clone);
+                        });
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
